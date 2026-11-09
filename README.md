@@ -2,7 +2,7 @@
 
 ![Banner colorido do Jogo da Velha — Máquina do Tempo](assets/banner-jogo-da-velha.svg)
 
-Um jogo da velha **100% offline**, desenvolvido para transformar um exercício clássico em uma experiência de estratégia com identidade visual própria. Além de disputar partidas entre X e O, a pessoa usuária pode voltar no tempo ao fim de cada rodada e rever cada decisão, lance a lance.
+Um jogo da velha com modo local/offline e um modo de partida compartilhada pela rede. Além de disputar partidas entre X e O, a pessoa usuária pode voltar no tempo ao fim de cada rodada e rever cada decisão, lance a lance.
 
 ## Objetivos do projeto
 
@@ -11,17 +11,45 @@ Um jogo da velha **100% offline**, desenvolvido para transformar um exercício c
 - Oferecer uma interface inclusiva, navegável por teclado e informativa para leitores de tela.
 - Criar um diferencial didático: a **Máquina do Tempo**, um replay da partida concluída.
 
-## Demonstração e execução local
+## Demonstração local/offline
 
 Não há instalação, build ou conexão com a internet. Basta abrir `index.html` em um navegador moderno.
 
-Como alternativa, é possível iniciar um servidor local na pasta do repositório:
+O modo local não precisa de servidor nem de conexão com a internet. Também pode ser servido localmente:
 
 ```bash
 python3 -m http.server 8000
 ```
 
 Depois, acesse [http://localhost:8000](http://localhost:8000) no navegador.
+
+## Demonstração distribuída em rede local
+
+O `server.py` usa apenas a biblioteca padrão do Python. Ele serve a interface, valida as jogadas e mantém o estado compartilhado em `partida.json`. O arquivo é transmitido aos clientes como JSON; a rota `/api/partida.json` também permite baixá-lo para comprovar a transmissão.
+
+1. Na VM Oracle Linux, entre na pasta do projeto e inicie o servidor:
+
+   ```bash
+   python3 server.py
+   ```
+
+2. Configure a placa de rede da VM como **Bridge/Placa em modo Bridge** no VirtualBox. Consulte o IP da VM:
+
+   ```bash
+   ip addr
+   ```
+
+3. Libere a porta TCP 8080 no firewall da VM:
+
+   ```bash
+   sudo firewall-cmd --permanent --add-port=8080/tcp
+   sudo firewall-cmd --reload
+   ```
+
+4. Nos dois computadores conectados à mesma rede, abra `http://IP_DA_VM:8080` e selecione **Conectar à partida compartilhada**. Uma jogada feita em um computador aparece nos demais em até cerca de um segundo.
+5. Para baixar o arquivo de estado transmitido, abra `http://IP_DA_VM:8080/api/partida.json` no outro computador.
+
+O modo compartilhado só é ativado pelo botão; abrir `index.html` continua executando a partida local/offline. O servidor deve permanecer aberto durante a apresentação.
 
 ## Funcionalidades (RF)
 
@@ -35,12 +63,13 @@ Depois, acesse [http://localhost:8000](http://localhost:8000) no navegador.
 | RF06 | Criar uma nova partida. | Limpa somente a grade e o histórico da rodada atual, preservando o placar. |
 | RF07 | Zerar o placar com confirmação. | Um diálogo modal exige confirmação explícita antes de apagar a pontuação. |
 | RF08 | Reproduzir uma partida concluída. | Os controles **Jogada anterior** e **Próxima jogada** percorrem o histórico sequencial. |
+| RF09 | Compartilhar uma partida pela rede local. | Clientes enviam jogadas ao servidor, que valida e transmite o estado atualizado em JSON. |
 
 ## Requisitos não funcionais (RNF)
 
 | ID | Requisito não funcional | Atendimento |
 | --- | --- | --- |
-| RNF01 | Execução offline. | Todos os arquivos são locais; não há dependências, fontes remotas ou APIs. |
+| RNF01 | Execução local/offline. | O modo local usa somente os arquivos do projeto; o modo distribuído é opcional e usa um servidor Python na rede local. |
 | RNF02 | Responsividade. | CSS Grid e Flexbox, unidades fluidas e regra mobile garantem adaptação sem rolagem horizontal. |
 | RNF03 | Acessibilidade WCAG AA. | Botões nativos, foco visível, contraste elevado, rótulos ARIA dinâmicos e região de status ao vivo. |
 | RNF04 | Compatibilidade. | JavaScript puro ES2020 e elementos HTML5 suportados por navegadores modernos. |
@@ -71,6 +100,7 @@ Evento de interface → GameController → GameModel → GameView
 - **`GameModel`**: contém o tabuleiro, jogador atual, histórico, placar e todas as regras de vitória, empate e replay. Não acessa o DOM.
 - **`GameView`**: consulta os elementos da página e atualiza conteúdo, classes CSS, estados bloqueados e atributos de acessibilidade. Não contém regras de negócio.
 - **`GameController`**: escuta os eventos dos botões, coordena chamadas entre Model e View e controla a posição do replay.
+- **`server.py` (modo distribuído)**: aplica as mesmas regras no nó servidor e persiste o estado autoritativo em `partida.json`. Os clientes consultam a versão atual e enviam jogadas por HTTP; um bloqueio protege as alterações concorrentes.
 
 ## Acessibilidade e interação
 
@@ -87,6 +117,7 @@ Evento de interface → GameController → GameModel → GameView
 │   └── banner-jogo-da-velha.svg  # Banner vetorial do projeto
 ├── app.js                        # Model, View e Controller
 ├── index.html                    # Estrutura e semântica da interface
+├── server.py                     # Servidor HTTP e API para partidas compartilhadas
 ├── styles.css                    # Tema, responsividade e estados visuais
 └── README.md                     # Documentação do projeto
 ```

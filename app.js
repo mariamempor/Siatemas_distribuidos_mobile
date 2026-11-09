@@ -63,6 +63,16 @@ class GameModel {
     });
     return replayBoard;
   }
+
+  loadState(state) {
+    this.board = [...state.board];
+    this.scores = { ...state.scores };
+    this.currentPlayer = state.currentPlayer;
+    this.history = state.history.map((move) => ({ ...move }));
+    this.isFinished = state.isFinished;
+    this.winner = state.winner;
+    this.winningLine = [...state.winningLine];
+  }
 }
 
 /** Visão: cria apenas a apresentação e atributos de acessibilidade no DOM. */
@@ -82,6 +92,8 @@ class GameView {
     this.replayDescription = document.querySelector("#replay-description");
     this.previousButton = document.querySelector("#previous-move");
     this.nextButton = document.querySelector("#next-move");
+    this.networkButton = document.querySelector("#network-toggle");
+    this.networkStatus = document.querySelector("#network-status");
   }
 
   renderBoard(board, { locked = false, winningLine = [], replaying = false } = {}) {
@@ -123,6 +135,9 @@ class GameController {
     this.model = model;
     this.view = view;
     this.replayPosition = 0;
+    this.networkConnected = false;
+    this.lastRevision = -1;
+    this.pollTimer = null;
     this.bindEvents();
     this.renderGame();
   }
@@ -134,9 +149,14 @@ class GameController {
     this.view.confirmResetButton.addEventListener("click", () => this.resetScores());
     this.view.previousButton.addEventListener("click", () => this.changeReplay(-1));
     this.view.nextButton.addEventListener("click", () => this.changeReplay(1));
+    this.view.networkButton.addEventListener("click", () => this.toggleNetwork());
   }
 
-  handleCellClick(index) {
+  async handleCellClick(index) {
+    if (this.networkConnected) {
+      await this.sendNetworkAction("/api/move", { index });
+      return;
+    }
     const result = this.model.play(index);
     if (!result) return;
     this.renderGame();
@@ -153,7 +173,11 @@ class GameController {
     }
   }
 
-  startNewGame() {
+  async startNewGame() {
+    if (this.networkConnected) {
+      await this.sendNetworkAction("/api/new-game", {});
+      return;
+    }
     this.model.startNewGame();
     this.replayPosition = 0;
     this.view.hideReplay();
@@ -162,6 +186,10 @@ class GameController {
   }
 
   resetScores() {
+    if (this.networkConnected) {
+      this.sendNetworkAction("/api/reset-scores", {});
+      return;
+    }
     this.model.resetScores();
     this.view.renderScores(this.model.scores);
     this.view.setStatus("Placar zerado. A partida atual continua em andamento.");
@@ -179,6 +207,82 @@ class GameController {
   renderGame() {
     this.view.renderBoard(this.model.board, { locked: this.model.isFinished, winningLine: this.model.winningLine });
     this.view.renderScores(this.model.scores);
+  }
+
+  async toggleNetwork() {
+    if (this.networkConnected) {
+      this.networkConnected = false;
+      window.clearInterval(this.pollTimer);
+      this.view.networkButton.textContent = "Conectar à partida compartilhada";
+      this.view.networkStatus.textContent = "Modo local: partida somente neste navegador.";
+      this.view.networkStatus.classList.remove("is-connected");
+      this.renderGame();
+      return;
+    }
+
+    this.view.networkButton.disabled = true;
+    this.view.networkStatus.textContent = "Conectando ao servidor…";
+    try {
+      const state = await this.fetchNetworkState();
+      this.applyNetworkState(state);
+      this.networkConnected = true;
+      this.view.networkButton.textContent = "Desconectar da partida compartilhada";
+      this.view.networkStatus.textContent = "Conectado: partida sincronizada pela rede.";
+      this.view.networkStatus.classList.add("is-connected");
+      this.pollTimer = window.setInterval(() => this.pollNetworkState(), 800);
+    } catch (error) {
+      this.view.networkStatus.textContent = `Não foi possível conectar: ${error.message}`;
+    } finally {
+      this.view.networkButton.disabled = false;
+    }
+  }
+
+  async fetchNetworkState() {
+    const response = await fetch("/api/state", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "servidor indisponível");
+    return payload;
+  }
+
+  async sendNetworkAction(path, body) {
+    try {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "ação recusada");
+      this.applyNetworkState(payload);
+    } catch (error) {
+      this.view.networkStatus.textContent = `Falha na comunicação: ${error.message}`;
+    }
+  }
+
+  async pollNetworkState() {
+    try {
+      const state = await this.fetchNetworkState();
+      if (state.revision !== this.lastRevision) this.applyNetworkState(state);
+      this.view.networkStatus.textContent = "Conectado: partida sincronizada pela rede.";
+    } catch (error) {
+      this.view.networkStatus.textContent = `Servidor desconectado: ${error.message}`;
+    }
+  }
+
+  applyNetworkState(state) {
+    this.model.loadState(state);
+    this.lastRevision = state.revision;
+    this.replayPosition = this.model.history.length;
+    this.renderGame();
+    if (this.model.isFinished) {
+      this.view.showReplay(this.replayPosition, this.model.history.length);
+      this.view.setStatus(this.model.winner
+        ? `Jogador ${this.model.winner} venceu! Use a Máquina do Tempo para rever a partida.`
+        : "Empate! Use a Máquina do Tempo para rever a partida.");
+    } else {
+      this.view.hideReplay();
+      this.view.setStatus(`Vez do jogador ${this.model.currentPlayer}.`);
+    }
   }
 }
 
