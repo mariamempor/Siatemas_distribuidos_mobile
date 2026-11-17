@@ -14,10 +14,15 @@
     <main class="app-shell">
       <section class="game-card" aria-labelledby="game-title">
         <header class="game-header">
-          <p class="game-code">Protocolo 03 × 03 <span aria-hidden="true">✦</span> sessão local</p>
+          <p class="game-code">Protocolo 03 × 03 <span aria-hidden="true">✦</span> sessão de jogo</p>
           <h1 id="game-title">Jogo da <span>Velha</span></h1>
           <p class="subtitle">Um duelo de estratégia com memória no tempo.</p>
         </header>
+
+        <section class="network-panel" aria-label="Modo de conexão">
+          <p id="network-status" role="status" aria-live="polite">Modo local: partida somente neste navegador.</p>
+          <button id="network-toggle" class="button button-secondary" type="button">Conectar à partida compartilhada</button>
+        </section>
 
         <section class="scoreboard" aria-label="Placar da partida">
           <article class="score score-x" aria-label="Vitórias do jogador X">

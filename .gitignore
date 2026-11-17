@@ -1,0 +1,4 @@
+# Runtime state created by the network server
+/partida.json
+/partida.tmp
+__pycache__/

@@ -88,6 +88,11 @@ h1 { margin: .35rem 0 .45rem; font-size: clamp(2.6rem, 9vw, 4.5rem); letter-spac
 h1 span { color: var(--o); text-shadow: 0 0 28px rgb(109 230 237 / 40%); }
 .subtitle { margin: 0; color: var(--muted); font-size: clamp(.9rem, 2.8vw, 1.05rem); }
 
+.network-panel { display: grid; justify-items: center; gap: .65rem; margin: 1.35rem 0 0; padding: .9rem; border: 1px solid var(--line); border-radius: .9rem; background: rgb(5 8 27 / 35%); text-align: center; }
+.network-panel p { margin: 0; color: var(--muted); font-size: .9rem; }
+.network-panel p.is-connected { color: var(--o-bright); }
+.network-panel button:disabled { cursor: wait; opacity: .65; }
+
 .scoreboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: .65rem; margin: 2rem 0 1.2rem; }
 .score { position: relative; min-width: 0; padding: .85rem .45rem .75rem; overflow: hidden; border: 1px solid var(--line); border-radius: .95rem; background: rgb(5 8 27 / 45%); text-align: center; }
 .score::before { position: absolute; top: 0; right: 16%; left: 16%; height: 2px; border-radius: 99px; content: ""; }
